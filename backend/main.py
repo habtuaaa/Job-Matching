@@ -21,7 +21,7 @@ ALGORITHM = "HS256"
 # ✅ CORS Middleware (for React frontend communication)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Adjust based on frontend URL
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000",],  # Adjust based on frontend URL
     allow_credentials=True,
     allow_methods=["*"],  # Allows all HTTP methods
     allow_headers=["*"],

@@ -1,7 +1,8 @@
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
-DATABASE_URL = "mysql+pymysql://root:11223344HHss@localhost/job_matching"
+# DATABASE_URL = "mysql+pymysql://root:11223344HHss@localhost/job_matching"
+DATABASE_URL = "mysql+pymysql://root:Yon24@localhost/job_matching"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

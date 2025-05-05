@@ -1,19 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from models import User, CompanyProfile as CompanyProfileModel
+from schemas import CompanyProfileCreate, CompanyProfile as CompanyProfileSchema
 from database import SessionLocal
-from models import CompanyProfile
-from schemas import CompanyProfileCreate, CompanyUpdate
 from auth import get_current_user
-from typing import Optional
-import os
-from pathlib import Path
-from auth import get_current_user  # Correct if auth.py is in the root
-
 
 router = APIRouter()
-
-UPLOAD_DIR = Path("static/uploads")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)  # Ensure upload folder exists
 
 def get_db():
     db = SessionLocal()
@@ -22,101 +14,69 @@ def get_db():
     finally:
         db.close()
 
-@router.post("/profile/")
-def create_company_profile(
-    company_name: str = Form(...),
-    email: str = Form(...),
-    industry: str = Form(...),
-    location: str = Form(...),
-    description: str = Form(...),
-    logo: Optional[UploadFile] = File(None),
-    cover_image: Optional[UploadFile] = File(None),
-    current_user=Depends(get_current_user),
+@router.post("/profile", response_model=CompanyProfileSchema)
+async def create_company_profile(
+    profile: CompanyProfileCreate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        # Check if user already has a company profile
+        existing_profile = db.query(CompanyProfileModel).filter(CompanyProfileModel.user_id == current_user.id).first()
+        if existing_profile:
+            raise HTTPException(status_code=400, detail="Company profile already exists")
 
-    logo_path, cover_image_path = None, None
+        # Create new company profile
+        db_profile = CompanyProfileModel(
+            user_id=current_user.id,
+            company_name=profile.company_name,
+            email=profile.email,
+            industry=profile.industry,
+            location=profile.location,
+            description=profile.description,
+            job_listings=[]  # Initialize as empty list
+        )
+        db.add(db_profile)
+        db.commit()
+        db.refresh(db_profile)
+        return db_profile
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create company profile: {str(e)}")
 
-    if logo:
-        logo_path = f"{UPLOAD_DIR}/{logo.filename}"
-        with open(logo_path, "wb") as f:
-            f.write(logo.file.read())
-
-    if cover_image:
-        cover_image_path = f"{UPLOAD_DIR}/{cover_image.filename}"
-        with open(cover_image_path, "wb") as f:
-            f.write(cover_image.file.read())
-
-    new_profile = CompanyProfile(
-        company_name=company_name,
-        email=email,
-        industry=industry,
-        location=location,
-        description=description,
-        job_listings="",  # Store as empty string if no job listings
-        logo=logo_path,
-        cover_image=cover_image_path,
-        owner_id=current_user.id
-    )
-    db.add(new_profile)
-    db.commit()
-    return {"message": "Company profile created successfully"}
-
-@router.get("/profile/")
-def get_company_profiles(db: Session = Depends(get_db)):
-    profiles = db.query(CompanyProfile).all()
-    
-    for profile in profiles:
-        profile.job_listings = profile.job_listings.split(", ") if profile.job_listings else []
-    
+@router.get("/profile", response_model=list[CompanyProfileSchema])
+async def get_company_profiles(db: Session = Depends(get_db)):
+    profiles = db.query(CompanyProfileModel).all()
     return profiles
 
-@router.put("/profile/update/")
-def update_company_profile(
-    company_name: Optional[str] = Form(None),
-    email: Optional[str] = Form(None),
-    industry: Optional[str] = Form(None),
-    location: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    logo: Optional[UploadFile] = File(None),
-    cover_image: Optional[UploadFile] = File(None),
-    current_user=Depends(get_current_user),
+@router.get("/my-profile", response_model=CompanyProfileSchema)
+async def get_my_company_profile(
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    company_profile = db.query(CompanyProfile).filter(CompanyProfile.owner_id == current_user.id).first()
-    if not company_profile:
+    profile = db.query(CompanyProfileModel).filter(CompanyProfileModel.user_id == current_user.id).first()
+    if not profile:
         raise HTTPException(status_code=404, detail="Company profile not found")
+    return profile
 
-    # Update text fields
-    update_fields = {
-        "company_name": company_name,
-        "email": email,
-        "industry": industry,
-        "location": location,
-        "description": description
-    }
+@router.put("/profile/update", response_model=CompanyProfileSchema)
+async def update_company_profile(
+    profile: CompanyProfileCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        company_profile = db.query(CompanyProfileModel).filter(CompanyProfileModel.user_id == current_user.id).first()
+        if not company_profile:
+            raise HTTPException(status_code=404, detail="Company profile not found")
 
-    for key, value in update_fields.items():
-        if value is not None:
+        # Update fields
+        for key, value in profile.dict(exclude_unset=True).items():
             setattr(company_profile, key, value)
 
-    # Handle file uploads
-    if logo:
-        logo_path = f"{UPLOAD_DIR}/{logo.filename}"
-        with open(logo_path, "wb") as f:
-            f.write(logo.file.read())
-        company_profile.logo = logo_path
-
-    if cover_image:
-        cover_image_path = f"{UPLOAD_DIR}/{cover_image.filename}"
-        with open(cover_image_path, "wb") as f:
-            f.write(cover_image.file.read())
-        company_profile.cover_image = cover_image_path
-
-    db.commit()
-    return {"message": "Company profile updated successfully"}
+        db.commit()
+        db.refresh(company_profile)
+        return company_profile
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update company profile: {str(e)}")
