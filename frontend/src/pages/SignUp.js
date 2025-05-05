@@ -1,6 +1,7 @@
+// frontend/src/pages/SignUp.js
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import "./SignUp.css";
 
 const SignUp = () => {
@@ -21,26 +22,36 @@ const SignUp = () => {
     }
     setError("");
     try {
-      const response = await axios.post("http://127.0.0.1:8000/api/auth/signup/", {
-        email,
-        password,
-      });
-      
-      console.log("Response:", response.data);  // Debugging
-    
+      const response = await axios.post(
+        "http://127.0.0.1:8000/api/auth/signup",
+        {
+          email,
+          password,
+        }
+      );
+
+      console.log("Signup response:", response.data);
+      console.log("Token:", response.data.access_token);
+      console.log("User ID:", response.data.user.id);
+      localStorage.setItem("token", response.data.access_token);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
       setIsSuccessful(true);
       setTimeout(() => {
         setEmail("");
         setPassword("");
         setConfirmPassword("");
         setIsSuccessful(false);
-        navigate("/login");
+        navigate("/register");
       }, 2000);
     } catch (err) {
-      console.error("Error:", err.response ? err.response.data : err.message); // Debugging
-      setError(err.response?.data?.detail || "Registration failed. Please try again.");
+      console.error(
+        "Signup error:",
+        err.response ? err.response.data : err.message
+      );
+      setError(
+        err.response?.data?.detail || "Registration failed. Please try again."
+      );
     }
-    
   };
 
   return (
@@ -72,7 +83,7 @@ const SignUp = () => {
         </div>
         <div className="password-container">
           <input
-            type={showConfirmPassword ? "text" : "password"}
+            type={showPassword ? "text" : "password"}
             placeholder="Confirm your password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}

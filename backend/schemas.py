@@ -26,10 +26,15 @@ class UserProfile(BaseModel):
 
 # User Profile Update Schema
 class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    skills: Optional[List[str]] = None
-    experience: Optional[str] = None
-    profile_picture: Optional[str] = None
+    name: Optional[str]
+    skills: Optional[List[str]]
+    location: Optional[str]
+    experience: Optional[str]
+    profile_picture: Optional[str]
+    education: Optional[str]
+    phone: Optional[str]
+    linkedin: Optional[str]
+    portfolio: Optional[str]
 
 # Company Registration Schema
 class CompanyProfileCreate(BaseModel):

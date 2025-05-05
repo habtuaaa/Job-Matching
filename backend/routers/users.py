@@ -1,3 +1,5 @@
+# backend/routers/users.py
+import json
 import os
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Depends, status, APIRouter
@@ -16,7 +18,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-app = FastAPI()
 router = APIRouter()
 
 def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)):
@@ -40,8 +41,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-@router.post("/signup/")
-def signup(user: UserCreate, db: Session = Depends(get_db)):
+@router.post("/signup")
+async def signup(user: UserCreate, db: Session = Depends(get_db)):
     """Registers a new user, hashes the password, and returns a token and profile data."""
     existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
@@ -50,7 +51,7 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
     hashed_password = pwd_context.hash(user.password)
 
     new_user = User(
-        name=user.name,
+        name=user.name or "Unnamed",
         email=user.email,
         password=hashed_password,
         skills="",
@@ -66,7 +67,7 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    token = jwt.encode({"user_id": new_user.id}, SECRET_KEY, algorithm=ALGORITHM)
+    token = create_access_token({"sub": str(new_user.id)})
 
     return {
         "message": "User created successfully!",
@@ -75,7 +76,7 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
             "id": new_user.id,
             "name": new_user.name,
             "email": new_user.email,
-            "skills": new_user.skills.split(", ") if new_user.skills else [],
+            "skills": json.loads(new_user.skills) if new_user.skills else [],
             "experience": new_user.experience or "Not provided",
             "profile_picture": new_user.profile_picture,
             "education": new_user.education or "Not provided",
@@ -86,23 +87,56 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
         }
     }
 
-@router.post("/login/")
-def login(user: UserLogin, db: Session = Depends(get_db)):
+@router.post("/login")
+async def login(user: UserLogin, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user.email).first()
     if not existing_user or not pwd_context.verify(user.password, existing_user.password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
-    token = create_access_token({"sub": existing_user.id})
+    token = create_access_token({"sub": str(existing_user.id)})
     return {"access_token": token}
 
-@router.get("/profile/", response_model=UserProfile)
-def get_profile(current_user: User = Depends(get_current_user)):
+@router.get("/profile", response_model=UserProfile)
+async def get_profile(current_user: User = Depends(get_current_user)):
     return UserProfile(
-        id=current_user.id, name=current_user.name, email=current_user.email,
-        skills=current_user.skills.split(", ") if current_user.skills else [],
+        id=current_user.id,
+        name=current_user.name,
+        email=current_user.email,
+        skills=json.loads(current_user.skills) if current_user.skills else [],
         experience=current_user.experience or "Not provided",
-        profile_picture=current_user.profile_picture, education=current_user.education or "Not provided",
-        location=current_user.location or "Not provided", phone=current_user.phone or "Not provided",
-        linkedin=current_user.linkedin or "Not provided", portfolio=current_user.portfolio or "Not provided"
+        profile_picture=current_user.profile_picture,
+        education=current_user.education or "Not provided",
+        location=current_user.location or "Not provided",
+        phone=current_user.phone or "Not provided",
+        linkedin=current_user.linkedin or "Not provided",
+        portfolio=current_user.portfolio or "Not provided"
     )
 
-app.include_router(router, prefix="/api/auth", tags=["Authentication"])
+@router.put("/update", response_model=UserProfile)
+async def update_profile(
+    user_update: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        for key, value in user_update.dict(exclude_unset=True).items():
+            if key == "skills" and isinstance(value, list):
+                value = json.dumps(value)
+            setattr(current_user, key, value)
+        db.commit()
+        db.refresh(current_user)
+        return UserProfile(
+            id=current_user.id,
+            name=current_user.name,
+            email=current_user.email,
+            skills=json.loads(current_user.skills) if current_user.skills else [],
+            experience=current_user.experience or "Not provided",
+            profile_picture=current_user.profile_picture,
+            education=current_user.education or "Not provided",
+            location=current_user.location or "Not provided",
+            phone=current_user.phone or "Not provided",
+            linkedin=current_user.linkedin or "Not provided",
+            portfolio=current_user.portfolio or "Not provided"
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update profile: {str(e)}")
