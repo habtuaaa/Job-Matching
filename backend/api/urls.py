@@ -1,0 +1,16 @@
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    # Auth endpoints
+    path('auth/signup/', views.signup, name='signup'),
+    path('auth/login/', views.login, name='login'),
+    path('auth/profile/', views.profile, name='profile'),
+    path('auth/update/', views.update_profile, name='update_profile'),
+    
+    # Company endpoints
+    path('companies/profile/', views.CompanyProfileList.as_view(), name='company_profiles'),
+    path('companies/my-profile/', views.my_company_profile, name='my_company_profile'),
+    path('companies/create/', views.create_company_profile, name='create_company_profile'),
+    path('companies/update/', views.update_company_profile, name='update_company_profile'),
+] 

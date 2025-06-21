@@ -1,6 +1,6 @@
-fastapi
-uvicorn
-sqlalchemy
-passlib[bcrypt]
-python-jose
-pydantic
+Django
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+Pillow
+python-decouple
