@@ -13,4 +13,8 @@ urlpatterns = [
     path('companies/my-profile/', views.my_company_profile, name='my_company_profile'),
     path('companies/create/', views.create_company_profile, name='create_company_profile'),
     path('companies/update/', views.update_company_profile, name='update_company_profile'),
+
+    # Job endpoints
+    path('jobs/', views.browse_jobs, name='browse_jobs'),  # GET: browse jobs
+    path('jobs/post/', views.post_job, name='post_job'),   # POST: post a job
 ] 

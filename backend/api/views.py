@@ -5,10 +5,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
-from .models import User, CompanyProfile
+from .models import User, CompanyProfile, Job
 from .serializers import (
     UserCreateSerializer, UserLoginSerializer, UserProfileSerializer, UserUpdateSerializer,
-    CompanyProfileCreateSerializer, CompanyProfileSerializer, CompanyUpdateSerializer
+    CompanyProfileCreateSerializer, CompanyProfileSerializer, CompanyUpdateSerializer, JobSerializer
 )
 
 
@@ -124,7 +124,6 @@ def create_company_profile(request):
         # Check if user already has a company profile
         if hasattr(request.user, 'company_profile'):
             return Response({'detail': 'Company profile already exists'}, status=status.HTTP_400_BAD_REQUEST)
-        
         company_profile = serializer.save(user=request.user)
         return Response(CompanyProfileSerializer(company_profile).data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -142,4 +141,30 @@ def update_company_profile(request):
             return Response(CompanyProfileSerializer(company_profile).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     except CompanyProfile.DoesNotExist:
-        return Response({'detail': 'Company profile not found'}, status=status.HTTP_404_NOT_FOUND) 
+        return Response({'detail': 'Company profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def post_job(request):
+    """Endpoint for companies to post a new job"""
+    user = request.user
+    # Ensure user has a company profile
+    if not hasattr(user, 'company_profile'):
+        return Response({'detail': 'Only companies can post jobs.'}, status=status.HTTP_403_FORBIDDEN)
+    data = request.data.copy()
+    data['company'] = user.company_profile.id
+    serializer = JobSerializer(data=data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def browse_jobs(request):
+    """Endpoint for job-seekers to browse all jobs"""
+    jobs = Job.objects.all().order_by('-posted_at')
+    serializer = JobSerializer(jobs, many=True)
+    return Response(serializer.data) 

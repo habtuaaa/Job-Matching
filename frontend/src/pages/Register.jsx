@@ -24,9 +24,16 @@ const Register = () => {
     industry: "",
     location: "",
     description: "",
+    linkedin: "",
+    portfolio: "",
   });
 
   const [error, setError] = useState("");
+  const [resume, setResume] = useState(null);
+  const [logo, setLogo] = useState(null);
+  const [profilePicture, setProfilePicture] = useState(null);
+  const [skillsInput, setSkillsInput] = useState('');
+  const [skillsList, setSkillsList] = useState([]);
 
   const handleJobSeekerInputChange = (e) => {
     const { name, value } = e.target;
@@ -44,6 +51,22 @@ const Register = () => {
     }));
   };
 
+  const handleResumeChange = (e) => setResume(e.target.files[0]);
+  const handleLogoChange = (e) => setLogo(e.target.files[0]);
+  const handleProfilePictureChange = (e) => setProfilePicture(e.target.files[0]);
+
+  const handleAddSkill = () => {
+    const skill = skillsInput.trim();
+    if (skill && !skillsList.includes(skill)) {
+      setSkillsList(prev => [...prev, skill]);
+      setSkillsInput('');
+    }
+  };
+
+  const handleRemoveSkill = (idx) => {
+    setSkillsList(prev => prev.filter((_, i) => i !== idx));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -57,21 +80,21 @@ const Register = () => {
 
       if (userType === "company") {
         // Create company profile
+        const form = new FormData();
+        Object.entries(companyData).forEach(([key, value]) => form.append(key, value));
+        if (logo) form.append('logo', logo);
         const response = await fetch("http://127.0.0.1:8000/api/companies/create/", {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`,
           },
-          body: JSON.stringify(companyData),
+          body: form,
         });
-
         if (response.ok) {
           // Update the user data in localStorage to reflect the company profile
           const userData = JSON.parse(localStorage.getItem("user") || "{}");
           userData.has_company_profile = true;
           localStorage.setItem("user", JSON.stringify(userData));
-          
           navigate("/company-dashboard");
         } else {
           const errorData = await response.json();
@@ -79,20 +102,18 @@ const Register = () => {
         }
       } else {
         // Update job seeker profile
-        const skillsArray = jobSeekerData.skills.split(',').map(skill => skill.trim()).filter(skill => skill);
-
+        const form = new FormData();
+        Object.entries(jobSeekerData).forEach(([key, value]) => form.append(key, value));
+        form.set('skills', JSON.stringify(skillsList));
+        if (resume) form.append('resume', resume);
+        if (profilePicture) form.append('profile_picture', profilePicture);
         const response = await fetch("http://127.0.0.1:8000/api/auth/update/", {
           method: "PUT",
           headers: {
-            "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            ...jobSeekerData,
-            skills: skillsArray,
-          }),
+          body: form,
         });
-
         if (response.ok) {
           navigate("/jobseeker-dashboard");
         } else {
@@ -153,14 +174,25 @@ const Register = () => {
               required
             />
 
-            <input
-              type="text"
-              name="skills"
-              placeholder="Skills (comma-separated)"
-              value={jobSeekerData.skills}
-              onChange={handleJobSeekerInputChange}
-              className="w-full p-3 mb-4 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
-            />
+            <label className="block mb-1 font-medium">Skills</label>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={skillsInput}
+                onChange={e => setSkillsInput(e.target.value)}
+                placeholder="Add a skill"
+                className="flex-1 p-2 border rounded"
+              />
+              <button type="button" onClick={handleAddSkill} className="bg-green-500 text-white px-3 py-1 rounded">+</button>
+            </div>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {skillsList.map((skill, idx) => (
+                <span key={idx} className="bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center">
+                  {skill}
+                  <button type="button" onClick={() => handleRemoveSkill(idx)} className="ml-2 text-red-500">&times;</button>
+                </span>
+              ))}
+            </div>
 
             <textarea
               name="experience"
@@ -215,6 +247,22 @@ const Register = () => {
               onChange={handleJobSeekerInputChange}
               className="w-full p-3 mb-4 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
             />
+
+            <label className="block mb-2 font-medium">Upload Resume (PDF, DOC, etc.)</label>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.txt"
+              onChange={handleResumeChange}
+              className="w-full mb-4"
+            />
+
+            <label className="block mb-2 font-medium">Upload Profile Picture (PNG, JPG, etc.)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleProfilePictureChange}
+              className="w-full mb-4"
+            />
           </>
         ) : (
           // Company Form
@@ -267,6 +315,32 @@ const Register = () => {
               className="w-full p-3 mb-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
               rows="4"
               required
+            />
+
+            <input
+              type="url"
+              name="linkedin"
+              placeholder="LinkedIn URL"
+              value={companyData.linkedin}
+              onChange={handleCompanyInputChange}
+              className="w-full p-3 mb-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+            />
+
+            <input
+              type="url"
+              name="portfolio"
+              placeholder="Portfolio URL"
+              value={companyData.portfolio}
+              onChange={handleCompanyInputChange}
+              className="w-full p-3 mb-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+            />
+
+            <label className="block mb-2 font-medium">Upload Company Logo (PNG, JPG, etc.)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleLogoChange}
+              className="w-full mb-4"
             />
           </>
         )}
