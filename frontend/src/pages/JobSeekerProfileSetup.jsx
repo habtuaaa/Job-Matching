@@ -15,6 +15,7 @@ const JobSeekerProfileSetup = () => {
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [resume, setResume] = useState(null);
   const navigate = useNavigate();
 
   const handleInputChange = (e) => {
@@ -23,6 +24,10 @@ const JobSeekerProfileSetup = () => {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleResumeChange = (e) => {
+    setResume(e.target.files[0]);
   };
 
   const handleSubmit = async (e) => {
@@ -41,16 +46,18 @@ const JobSeekerProfileSetup = () => {
       // Convert skills string to array
       const skillsArray = formData.skills.split(',').map(skill => skill.trim()).filter(skill => skill);
 
+      const form = new FormData();
+      Object.entries(formData).forEach(([key, value]) => form.append(key, value));
+      form.set('skills', JSON.stringify(skillsArray));
+      if (resume) form.append('resume', resume);
+
       const response = await axios.put(
         "http://127.0.0.1:8000/api/auth/update/",
-        {
-          ...formData,
-          skills: skillsArray,
-        },
+        form,
         {
           headers: {
             "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
+            "Content-Type": "multipart/form-data",
           },
         }
       );
@@ -143,6 +150,14 @@ const JobSeekerProfileSetup = () => {
           value={formData.portfolio}
           onChange={handleInputChange}
           className="w-full p-3 mb-4 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+        />
+
+        <label className="block mb-2 font-medium">Upload Resume (PDF, DOC, etc.)</label>
+        <input
+          type="file"
+          accept=".pdf,.doc,.docx,.txt"
+          onChange={handleResumeChange}
+          className="w-full mb-4"
         />
 
         {error && <p className="text-red-500 text-center mb-4">{error}</p>}

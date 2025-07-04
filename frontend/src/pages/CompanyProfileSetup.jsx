@@ -12,6 +12,7 @@ const CompanyProfileSetup = () => {
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [logo, setLogo] = useState(null);
   const navigate = useNavigate();
 
   const handleInputChange = (e) => {
@@ -20,6 +21,10 @@ const CompanyProfileSetup = () => {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleLogoChange = (e) => {
+    setLogo(e.target.files[0]);
   };
 
   const handleSubmit = async (e) => {
@@ -35,13 +40,17 @@ const CompanyProfileSetup = () => {
         return;
       }
 
+      const form = new FormData();
+      Object.entries(formData).forEach(([key, value]) => form.append(key, value));
+      if (logo) form.append('logo', logo);
+
       const response = await axios.post(
         "http://127.0.0.1:8000/api/companies/create/",
-        formData,
+        form,
         {
           headers: {
             "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
+            "Content-Type": "multipart/form-data",
           },
         }
       );
@@ -111,6 +120,14 @@ const CompanyProfileSetup = () => {
           className="w-full p-3 mb-4 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
           rows="4"
           required
+        />
+
+        <label className="block mb-2 font-medium">Upload Company Logo (PNG, JPG, etc.)</label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleLogoChange}
+          className="w-full mb-4"
         />
 
         {error && <p className="text-red-500 text-center mb-4">{error}</p>}
