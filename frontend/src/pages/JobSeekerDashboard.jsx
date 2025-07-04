@@ -366,6 +366,20 @@ const JobSeekerDashboard = () => {
                     {job.company_info && (
                       <div className="mt-2 text-sm text-gray-500">
                         <span className="font-semibold">About {job.company_info.company_name}:</span> {job.company_info.description} <span className="ml-2">({job.company_info.industry})</span>
+                        {(job.company_info.linkedin || job.company_info.portfolio) && (
+                          <div className="flex flex-col gap-1 mt-1">
+                            {job.company_info.linkedin && (
+                              <div>
+                                <span className="font-semibold">LinkedIn:</span> <a href={job.company_info.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">{job.company_info.linkedin}</a>
+                              </div>
+                            )}
+                            {job.company_info.portfolio && (
+                              <div>
+                                <span className="font-semibold">Portfolio:</span> <a href={job.company_info.portfolio} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">{job.company_info.portfolio}</a>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="flex justify-between items-center mt-6">
