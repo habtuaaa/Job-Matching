@@ -64,6 +64,14 @@ const JobSeekerDashboard = () => {
   const [editSkillsInput, setEditSkillsInput] = useState('');
   const [editSkillsList, setEditSkillsList] = useState([]);
 
+  // Add state for application modal and cover letter
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [coverLetter, setCoverLetter] = useState("");
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [applyError, setApplyError] = useState("");
+  const [applySuccess, setApplySuccess] = useState(false);
+  const [jobToApply, setJobToApply] = useState(null);
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -188,6 +196,36 @@ const JobSeekerDashboard = () => {
       setEditSuccess(true);
     } catch (err) {
       setEditError(err.response?.data?.detail || 'Failed to update profile');
+    }
+  };
+
+  // Handler for Apply button
+  const handleOpenApplyModal = (job) => {
+    setJobToApply(job);
+    setCoverLetter("");
+    setApplyError("");
+    setShowApplyModal(true);
+  };
+
+  const handleApplyToJob = async () => {
+    if (!jobToApply) return;
+    setApplyLoading(true);
+    setApplyError("");
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `http://127.0.0.1:8000/api/jobs/${jobToApply.id}/apply/`,
+        { cover_letter: coverLetter },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setApplySuccess(true);
+      setShowApplyModal(false);
+    } catch (err) {
+      setApplyError(
+        err.response?.data?.detail || "Failed to apply for job."
+      );
+    } finally {
+      setApplyLoading(false);
     }
   };
 
@@ -384,7 +422,7 @@ const JobSeekerDashboard = () => {
                     )}
                     <div className="flex justify-between items-center mt-6">
                       <Button onClick={handlePrevJob} variant="outlined" disabled={jobs.length <= 1}>Previous</Button>
-                      <Button color="primary" variant="contained" onClick={() => setShowSnackbar(true)}>Apply</Button>
+                      <Button color="primary" variant="contained" onClick={() => handleOpenApplyModal(job)}>Apply</Button>
                       <Button onClick={handleNextJob} variant="outlined" disabled={jobs.length <= 1}>Next</Button>
                     </div>
                   </div>
@@ -397,11 +435,31 @@ const JobSeekerDashboard = () => {
           <Button onClick={() => setShowJobsModal(false)} color="secondary" variant="outlined">Close</Button>
         </DialogActions>
       </Dialog>
+      <Dialog open={showApplyModal} onClose={() => setShowApplyModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle className="text-xl font-bold text-center">Apply for {jobToApply?.title}</DialogTitle>
+        <DialogContent dividers style={{ padding: 32 }}>
+          <label className="block mb-2 font-medium">Cover Letter</label>
+          <textarea
+            className="w-full p-2 border rounded min-h-[120px]"
+            value={coverLetter}
+            onChange={e => setCoverLetter(e.target.value)}
+            placeholder="Write a brief cover letter..."
+            rows={6}
+          />
+          {applyError && <p className="text-red-500 mt-2">{applyError}</p>}
+        </DialogContent>
+        <DialogActions style={{ padding: 24 }}>
+          <Button onClick={() => setShowApplyModal(false)} color="secondary" variant="outlined" disabled={applyLoading}>Cancel</Button>
+          <Button onClick={handleApplyToJob} color="primary" variant="contained" disabled={applyLoading || !coverLetter.trim()}>
+            {applyLoading ? "Applying..." : "Confirm & Apply"}
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Snackbar
-        open={showSnackbar}
+        open={applySuccess}
         autoHideDuration={2000}
-        onClose={() => setShowSnackbar(false)}
-        message="Apply feature coming soon!"
+        onClose={() => setApplySuccess(false)}
+        message="Application submitted!"
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
       <Dialog

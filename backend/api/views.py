@@ -5,10 +5,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
-from .models import User, CompanyProfile, Job
+from .models import User, CompanyProfile, Job, JobApplication
 from .serializers import (
     UserCreateSerializer, UserLoginSerializer, UserProfileSerializer, UserUpdateSerializer,
-    CompanyProfileCreateSerializer, CompanyProfileSerializer, CompanyUpdateSerializer, JobSerializer
+    CompanyProfileCreateSerializer, CompanyProfileSerializer, CompanyUpdateSerializer, JobSerializer,
+    JobApplicationSerializer
 )
 
 
@@ -167,4 +168,32 @@ def browse_jobs(request):
     """Endpoint for job-seekers to browse all jobs"""
     jobs = Job.objects.all().order_by('-posted_at')
     serializer = JobSerializer(jobs, many=True)
+    return Response(serializer.data) 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def apply_to_job(request, job_id):
+    """Endpoint for job-seekers to apply to a job"""
+    job = get_object_or_404(Job, id=job_id)
+    # Prevent duplicate applications
+    if JobApplication.objects.filter(job=job, applicant=request.user).exists():
+        return Response({'detail': 'You have already applied to this job.'}, status=400)
+    cover_letter = request.data.get('cover_letter', '')
+    application = JobApplication.objects.create(
+        job=job,
+        applicant=request.user,
+        cover_letter=cover_letter
+    )
+    serializer = JobApplicationSerializer(application)
+    return Response(serializer.data, status=201)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def company_applicants(request):
+    """Endpoint for companies to view all applicants for their jobs"""
+    if not hasattr(request.user, 'company_profile'):
+        return Response({'detail': 'Only companies can view applicants.'}, status=403)
+    company = request.user.company_profile
+    applications = JobApplication.objects.filter(job__company=company).select_related('job', 'applicant').order_by('-applied_at')
+    serializer = JobApplicationSerializer(applications, many=True)
     return Response(serializer.data) 

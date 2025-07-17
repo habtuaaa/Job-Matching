@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import User, CompanyProfile, Job
+from .models import User, CompanyProfile, Job, JobApplication
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
@@ -106,3 +106,18 @@ class JobSerializer(serializers.ModelSerializer):
             'linkedin': company.linkedin,
             'portfolio': company.portfolio,
         } 
+
+
+class ApplicantInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'name', 'email']
+
+class JobApplicationSerializer(serializers.ModelSerializer):
+    applicant = ApplicantInfoSerializer(read_only=True)
+    job = serializers.PrimaryKeyRelatedField(queryset=Job.objects.all())
+
+    class Meta:
+        model = JobApplication
+        fields = ['id', 'job', 'applicant', 'cover_letter', 'status', 'applied_at']
+        read_only_fields = ['status', 'applied_at', 'applicant'] 

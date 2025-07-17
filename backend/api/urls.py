@@ -17,4 +17,6 @@ urlpatterns = [
     # Job endpoints
     path('jobs/', views.browse_jobs, name='browse_jobs'),  # GET: browse jobs
     path('jobs/post/', views.post_job, name='post_job'),   # POST: post a job
+    path('jobs/<int:job_id>/apply/', views.apply_to_job, name='apply_to_job'),  # POST: apply to a job
+    path('companies/applicants/', views.company_applicants, name='company_applicants'),  # GET: view applicants
 ] 
