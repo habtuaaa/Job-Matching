@@ -48,7 +48,7 @@ const JobSeekerProfileSetup = () => {
 
       const form = new FormData();
       Object.entries(formData).forEach(([key, value]) => form.append(key, value));
-      form.set('skills', JSON.stringify(skillsArray));
+      skillsArray.forEach(skill => form.append('skills', skill));
       if (resume) form.append('resume', resume);
 
       const response = await axios.put(

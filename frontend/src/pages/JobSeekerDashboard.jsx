@@ -10,6 +10,8 @@ import Divider from '@mui/material/Divider';
 import Snackbar from '@mui/material/Snackbar';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
+import MessageIcon from '@mui/icons-material/Message';
+import Badge from '@mui/material/Badge';
 
 // Helper to robustly parse and flatten skills
 function parseSkills(skills) {
@@ -64,6 +66,15 @@ const JobSeekerDashboard = () => {
   const [editSkillsInput, setEditSkillsInput] = useState('');
   const [editSkillsList, setEditSkillsList] = useState([]);
 
+  // Add state for application modal and cover letter
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [coverLetter, setCoverLetter] = useState("");
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [applyError, setApplyError] = useState("");
+  const [applySuccess, setApplySuccess] = useState(false);
+  const [jobToApply, setJobToApply] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -113,6 +124,21 @@ const JobSeekerDashboard = () => {
       setEditSkillsList(parseSkills(userData.skills));
     }
   }, [userData]);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.get("http://127.0.0.1:8000/api/messages/unread-count/", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUnreadCount(res.data.unread_count);
+      } catch {}
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 10000); // Poll every 10s
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -191,18 +217,53 @@ const JobSeekerDashboard = () => {
     }
   };
 
+  // Handler for Apply button
+  const handleOpenApplyModal = (job) => {
+    setJobToApply(job);
+    setCoverLetter("");
+    setApplyError("");
+    setShowApplyModal(true);
+  };
+
+  const handleApplyToJob = async () => {
+    if (!jobToApply) return;
+    setApplyLoading(true);
+    setApplyError("");
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `http://127.0.0.1:8000/api/jobs/${jobToApply.id}/apply/`,
+        { cover_letter: coverLetter },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setApplySuccess(true);
+      setShowApplyModal(false);
+    } catch (err) {
+      setApplyError(
+        err.response?.data?.detail || "Failed to apply for job."
+      );
+    } finally {
+      setApplyLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-2 sm:p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">Job Seeker Dashboard</h2>
-            <button 
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 w-full sm:w-auto"
-            >
-              Logout
-            </button>
+            <div className="flex items-center gap-4">
+              <Badge badgeContent={unreadCount} color="error">
+                <MessageIcon style={{ cursor: 'pointer', fontSize: 32 }} onClick={() => navigate('/messages')} />
+              </Badge>
+              <button 
+                onClick={handleLogout}
+                className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 w-full sm:w-auto"
+              >
+                Logout
+              </button>
+            </div>
           </div>
           
           {error && <p className="text-red-500 mb-4">{error}</p>}
@@ -281,7 +342,7 @@ const JobSeekerDashboard = () => {
               <div className="flex flex-col sm:flex-row gap-4 mt-8">
                 <button className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 w-full sm:w-auto" onClick={() => setShowEditModal(true)}>Edit Profile</button>
                 <button className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 w-full sm:w-auto" onClick={handleBrowseJobs}>Browse Jobs</button>
-                <button className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 w-full sm:w-auto">View Applications</button>
+                <button className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 w-full sm:w-auto" onClick={() => navigate('/my-applications')}>View Applications</button>
               </div>
             </div>
           ) : (
@@ -384,7 +445,7 @@ const JobSeekerDashboard = () => {
                     )}
                     <div className="flex justify-between items-center mt-6">
                       <Button onClick={handlePrevJob} variant="outlined" disabled={jobs.length <= 1}>Previous</Button>
-                      <Button color="primary" variant="contained" onClick={() => setShowSnackbar(true)}>Apply</Button>
+                      <Button color="primary" variant="contained" onClick={() => handleOpenApplyModal(job)}>Apply</Button>
                       <Button onClick={handleNextJob} variant="outlined" disabled={jobs.length <= 1}>Next</Button>
                     </div>
                   </div>
@@ -397,11 +458,31 @@ const JobSeekerDashboard = () => {
           <Button onClick={() => setShowJobsModal(false)} color="secondary" variant="outlined">Close</Button>
         </DialogActions>
       </Dialog>
+      <Dialog open={showApplyModal} onClose={() => setShowApplyModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle className="text-xl font-bold text-center">Apply for {jobToApply?.title}</DialogTitle>
+        <DialogContent dividers style={{ padding: 32 }}>
+          <label className="block mb-2 font-medium">Cover Letter</label>
+          <textarea
+            className="w-full p-2 border rounded min-h-[120px]"
+            value={coverLetter}
+            onChange={e => setCoverLetter(e.target.value)}
+            placeholder="Write a brief cover letter..."
+            rows={6}
+          />
+          {applyError && <p className="text-red-500 mt-2">{applyError}</p>}
+        </DialogContent>
+        <DialogActions style={{ padding: 24 }}>
+          <Button onClick={() => setShowApplyModal(false)} color="secondary" variant="outlined" disabled={applyLoading}>Cancel</Button>
+          <Button onClick={handleApplyToJob} color="primary" variant="contained" disabled={applyLoading || !coverLetter.trim()}>
+            {applyLoading ? "Applying..." : "Confirm & Apply"}
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Snackbar
-        open={showSnackbar}
+        open={applySuccess}
         autoHideDuration={2000}
-        onClose={() => setShowSnackbar(false)}
-        message="Apply feature coming soon!"
+        onClose={() => setApplySuccess(false)}
+        message="Application submitted!"
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
       <Dialog
