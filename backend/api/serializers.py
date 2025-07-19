@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import User, CompanyProfile, Job, JobApplication
+from .models import User, CompanyProfile, Job, JobApplication, Message
+import json
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
@@ -109,15 +110,64 @@ class JobSerializer(serializers.ModelSerializer):
 
 
 class ApplicantInfoSerializer(serializers.ModelSerializer):
+    skills = serializers.SerializerMethodField()
+    resume = serializers.FileField(required=False, allow_null=True)
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
     class Meta:
         model = User
-        fields = ['id', 'name', 'email']
+        fields = [
+            'id', 'name', 'email', 'skills', 'experience', 'profile_picture',
+            'education', 'location', 'phone', 'linkedin', 'portfolio', 'resume'
+        ]
+
+    def get_skills(self, obj):
+        # If it's a list with a single string that looks like a JSON array, parse it
+        if isinstance(obj.skills, list) and len(obj.skills) == 1 and isinstance(obj.skills[0], str):
+            try:
+                val = json.loads(obj.skills[0])
+                if isinstance(val, list):
+                    return val
+            except Exception:
+                pass
+        if isinstance(obj.skills, list):
+            return obj.skills
+        if isinstance(obj.skills, str):
+            try:
+                val = json.loads(obj.skills)
+                if isinstance(val, list):
+                    return val
+            except Exception:
+                pass
+        return []
 
 class JobApplicationSerializer(serializers.ModelSerializer):
     applicant = ApplicantInfoSerializer(read_only=True)
     job = serializers.PrimaryKeyRelatedField(queryset=Job.objects.all())
+    job_title = serializers.SerializerMethodField()
+    company_name = serializers.SerializerMethodField()
 
     class Meta:
         model = JobApplication
-        fields = ['id', 'job', 'applicant', 'cover_letter', 'status', 'applied_at']
-        read_only_fields = ['status', 'applied_at', 'applicant'] 
+        fields = ['id', 'job', 'job_title', 'company_name', 'applicant', 'cover_letter', 'status', 'applied_at']
+        read_only_fields = ['applied_at', 'applicant', 'job_title', 'company_name']
+
+    def get_job_title(self, obj):
+        return obj.job.title
+
+    def get_company_name(self, obj):
+        return obj.job.company.company_name if obj.job and obj.job.company else None
+
+class MessageSerializer(serializers.ModelSerializer):
+    sender_info = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Message
+        fields = ['id', 'application', 'sender', 'sender_info', 'text', 'timestamp', 'is_read']
+        read_only_fields = ['id', 'sender', 'sender_info', 'timestamp', 'is_read']
+
+    def get_sender_info(self, obj):
+        return {
+            'id': obj.sender.id,
+            'name': obj.sender.name,
+            'email': obj.sender.email,
+        }

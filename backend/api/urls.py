@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import JobApplicationStatusUpdateView, my_applications, application_messages
 
 urlpatterns = [
     # Auth endpoints
@@ -19,4 +20,10 @@ urlpatterns = [
     path('jobs/post/', views.post_job, name='post_job'),   # POST: post a job
     path('jobs/<int:job_id>/apply/', views.apply_to_job, name='apply_to_job'),  # POST: apply to a job
     path('companies/applicants/', views.company_applicants, name='company_applicants'),  # GET: view applicants
+    path('companies/applicants/<int:pk>/', JobApplicationStatusUpdateView.as_view(), name='update_application_status'),
+    path('jobs/my-applications/', my_applications, name='my_applications'),
+    path('applications/<int:application_id>/messages/', application_messages, name='application_messages'),
+    path('messages/threads/', views.message_threads, name='message_threads'),
+    path('messages/unread-count/', views.unread_message_count, name='unread_message_count'),
+    path('applications/<int:application_id>/mark-read/', views.mark_messages_read, name='mark_messages_read'),
 ] 

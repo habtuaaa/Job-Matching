@@ -9,6 +9,9 @@ import CompanyDashboard from './pages/CompanyDashboard';
 import JobSeekerDashboard from './pages/JobSeekerDashboard';
 import CompanyProfileSetup from './pages/CompanyProfileSetup';
 import JobSeekerProfileSetup from './pages/JobSeekerProfileSetup';
+import Applicants from './pages/Applicants';
+import MyApplications from "./pages/MyApplications";
+import Messages from "./pages/Messages";
 
 function App() {
   return (
@@ -24,6 +27,9 @@ function App() {
           <Route path="/jobseeker-dashboard" element={<JobSeekerDashboard />} />
           <Route path="/company-profile-setup" element={<CompanyProfileSetup />} />
           <Route path="/jobseeker-profile-setup" element={<JobSeekerProfileSetup />} />
+          <Route path="/applicants" element={<Applicants />} />
+          <Route path="/my-applications" element={<MyApplications />} />
+          <Route path="/messages" element={<Messages />} />
         </Routes>
       </div>
     </Router>

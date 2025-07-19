@@ -8,6 +8,8 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Snackbar from '@mui/material/Snackbar';
+import MessageIcon from '@mui/icons-material/Message';
+import Badge from '@mui/material/Badge';
 
 const CompanyDashboard = () => {
   const navigate = useNavigate();
@@ -47,6 +49,7 @@ const CompanyDashboard = () => {
   });
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!token) {
@@ -91,6 +94,21 @@ const CompanyDashboard = () => {
       });
     }
   }, [companyData]);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.get("http://127.0.0.1:8000/api/messages/unread-count/", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUnreadCount(res.data.unread_count);
+      } catch {}
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 10000); // Poll every 10s
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -220,14 +238,19 @@ const CompanyDashboard = () => {
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-3xl font-bold text-gray-800">Company Dashboard</h2>
-            <button 
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300"
-            >
-              Logout
-            </button>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">Company Dashboard</h2>
+            <div className="flex items-center gap-4">
+              <Badge badgeContent={unreadCount} color="error">
+                <MessageIcon style={{ cursor: 'pointer', fontSize: 32 }} onClick={() => navigate('/messages')} />
+              </Badge>
+              <button 
+                onClick={handleLogout}
+                className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 w-full sm:w-auto"
+              >
+                Logout
+              </button>
+            </div>
           </div>
           
           {error && <p className="text-red-500 mb-4">{error}</p>}
@@ -309,6 +332,12 @@ const CompanyDashboard = () => {
                   onClick={() => setShowJobModal(true)}
                 >
                   Post New Job
+                </button>
+                <button
+                  className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300"
+                  onClick={() => navigate('/applicants')}
+                >
+                  View Applicants
                 </button>
               </div>
             </div>

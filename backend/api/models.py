@@ -114,3 +114,17 @@ class JobApplication(models.Model):
 
     def __str__(self):
         return f"{self.applicant.email} applied to {self.job.title}" 
+
+
+class Message(models.Model):
+    application = models.ForeignKey(JobApplication, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
+    text = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['timestamp']
+
+    def __str__(self):
+        return f"{self.sender.email}: {self.text[:30]}..." 

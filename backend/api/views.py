@@ -9,8 +9,12 @@ from .models import User, CompanyProfile, Job, JobApplication
 from .serializers import (
     UserCreateSerializer, UserLoginSerializer, UserProfileSerializer, UserUpdateSerializer,
     CompanyProfileCreateSerializer, CompanyProfileSerializer, CompanyUpdateSerializer, JobSerializer,
-    JobApplicationSerializer
+    JobApplicationSerializer, MessageSerializer
 )
+from rest_framework.generics import UpdateAPIView
+from django.db.models import Q, Max, Count
+import datetime
+from django.utils import timezone
 
 
 @api_view(['POST'])
@@ -197,3 +201,107 @@ def company_applicants(request):
     applications = JobApplication.objects.filter(job__company=company).select_related('job', 'applicant').order_by('-applied_at')
     serializer = JobApplicationSerializer(applications, many=True)
     return Response(serializer.data) 
+
+class JobApplicationStatusUpdateView(UpdateAPIView):
+    queryset = JobApplication.objects.all()
+    serializer_class = JobApplicationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Only allow company to update applications for their jobs
+        user = self.request.user
+        if hasattr(user, 'company_profile'):
+            return JobApplication.objects.filter(job__company=user.company_profile)
+        return JobApplication.objects.none() 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_applications(request):
+    """List all job applications for the authenticated job seeker"""
+    applications = JobApplication.objects.filter(applicant=request.user).select_related('job', 'job__company').order_by('-applied_at')
+    serializer = JobApplicationSerializer(applications, many=True)
+    return Response(serializer.data) 
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def application_messages(request, application_id):
+    """List or send messages for a job application (company or applicant only)"""
+    application = get_object_or_404(JobApplication, id=application_id)
+    user = request.user
+    # Only allow applicant or company
+    if not (user == application.applicant or (hasattr(user, 'company_profile') and application.job.company == user.company_profile)):
+        return Response({'detail': 'Not authorized.'}, status=403)
+    if request.method == 'GET':
+        messages = application.messages.select_related('sender').all()
+        serializer = MessageSerializer(messages, many=True)
+        return Response(serializer.data)
+    elif request.method == 'POST':
+        text = request.data.get('text', '').strip()
+        if not text:
+            return Response({'detail': 'Message text required.'}, status=400)
+        message = application.messages.create(sender=user, text=text)
+        serializer = MessageSerializer(message)
+        return Response(serializer.data, status=201) 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def message_threads(request):
+    """List all conversation threads for the current user (grouped by application and other user)"""
+    user = request.user
+    threads = []
+    company_profile = getattr(user, 'company_profile', None)
+    # Only include applications where user is applicant or company
+    if company_profile:
+        applications = JobApplication.objects.filter(Q(applicant=user) | Q(job__company=company_profile)).distinct()
+    else:
+        applications = JobApplication.objects.filter(applicant=user).distinct()
+    for app in applications:
+        # Determine the other user
+        if user == app.applicant:
+            other_user = app.job.company.user
+        else:
+            other_user = app.applicant
+        # Get last message
+        last_msg = app.messages.order_by('-timestamp').first()
+        # Count unread messages for this thread (not sent by current user)
+        unread_count = app.messages.filter(is_read=False).exclude(sender=user).count()
+        threads.append({
+            'application_id': app.id,
+            'job_title': app.job.title,
+            'other_user': {
+                'id': other_user.id,
+                'name': other_user.name,
+                'email': other_user.email,
+            },
+            'last_message': last_msg.text if last_msg else None,
+            'last_message_time': last_msg.timestamp if last_msg else None,
+            'unread_count': unread_count,
+        })
+    # Sort by last_message_time desc
+    threads.sort(
+        key=lambda t: t['last_message_time'] or timezone.make_aware(datetime.datetime.min, datetime.timezone.utc),
+        reverse=True
+    )
+    return Response(threads) 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def unread_message_count(request):
+    user = request.user
+    applications = JobApplication.objects.filter(Q(applicant=user) | Q(job__company=getattr(user, 'company_profile', None)))
+    count = 0
+    for app in applications:
+        count += app.messages.filter(is_read=False).exclude(sender=user).count()
+    return Response({'unread_count': count}) 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_messages_read(request, application_id):
+    user = request.user
+    application = get_object_or_404(JobApplication, id=application_id)
+    # Only allow applicant or company
+    if not (user == application.applicant or (hasattr(user, 'company_profile') and application.job.company == user.company_profile)):
+        return Response({'detail': 'Not authorized.'}, status=403)
+    # Mark all messages not sent by user as read
+    application.messages.filter(is_read=False).exclude(sender=user).update(is_read=True)
+    return Response({'status': 'success'}) 

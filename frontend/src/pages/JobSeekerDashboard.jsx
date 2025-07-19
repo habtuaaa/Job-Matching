@@ -10,6 +10,8 @@ import Divider from '@mui/material/Divider';
 import Snackbar from '@mui/material/Snackbar';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
+import MessageIcon from '@mui/icons-material/Message';
+import Badge from '@mui/material/Badge';
 
 // Helper to robustly parse and flatten skills
 function parseSkills(skills) {
@@ -71,6 +73,7 @@ const JobSeekerDashboard = () => {
   const [applyError, setApplyError] = useState("");
   const [applySuccess, setApplySuccess] = useState(false);
   const [jobToApply, setJobToApply] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -121,6 +124,21 @@ const JobSeekerDashboard = () => {
       setEditSkillsList(parseSkills(userData.skills));
     }
   }, [userData]);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.get("http://127.0.0.1:8000/api/messages/unread-count/", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUnreadCount(res.data.unread_count);
+      } catch {}
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 10000); // Poll every 10s
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -235,12 +253,17 @@ const JobSeekerDashboard = () => {
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">Job Seeker Dashboard</h2>
-            <button 
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 w-full sm:w-auto"
-            >
-              Logout
-            </button>
+            <div className="flex items-center gap-4">
+              <Badge badgeContent={unreadCount} color="error">
+                <MessageIcon style={{ cursor: 'pointer', fontSize: 32 }} onClick={() => navigate('/messages')} />
+              </Badge>
+              <button 
+                onClick={handleLogout}
+                className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300 w-full sm:w-auto"
+              >
+                Logout
+              </button>
+            </div>
           </div>
           
           {error && <p className="text-red-500 mb-4">{error}</p>}
@@ -319,7 +342,7 @@ const JobSeekerDashboard = () => {
               <div className="flex flex-col sm:flex-row gap-4 mt-8">
                 <button className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 w-full sm:w-auto" onClick={() => setShowEditModal(true)}>Edit Profile</button>
                 <button className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 w-full sm:w-auto" onClick={handleBrowseJobs}>Browse Jobs</button>
-                <button className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 w-full sm:w-auto">View Applications</button>
+                <button className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 w-full sm:w-auto" onClick={() => navigate('/my-applications')}>View Applications</button>
               </div>
             </div>
           ) : (

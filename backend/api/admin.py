@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, CompanyProfile, Job, JobApplication
+from .models import User, CompanyProfile, Job, JobApplication, Message
 
 
 @admin.register(User)
@@ -46,3 +46,10 @@ class JobApplicationAdmin(admin.ModelAdmin):
     list_filter = ('status', 'job')
     search_fields = ('job__title', 'applicant__email')
     ordering = ('-applied_at',) 
+
+
+@admin.register(Message)
+class MessageAdmin(admin.ModelAdmin):
+    list_display = ('application', 'sender', 'text', 'timestamp', 'is_read')
+    list_filter = ('is_read', 'timestamp', 'sender')
+    search_fields = ('text', 'sender__email', 'application__id') 
