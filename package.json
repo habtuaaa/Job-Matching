@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@react-spring/web": "^10.0.1",
+    "react-swipeable": "^7.0.2",
+    "react-tinder-card": "^1.6.4"
+  }
+}

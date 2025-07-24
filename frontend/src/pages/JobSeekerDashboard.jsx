@@ -12,6 +12,10 @@ import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 import MessageIcon from '@mui/icons-material/Message';
 import Badge from '@mui/material/Badge';
+import { useSwipeable } from 'react-swipeable';
+import TinderCard from 'react-tinder-card';
+import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 
 // Helper to robustly parse and flatten skills
 function parseSkills(skills) {
@@ -65,15 +69,11 @@ const JobSeekerDashboard = () => {
   const [editSuccess, setEditSuccess] = useState(false);
   const [editSkillsInput, setEditSkillsInput] = useState('');
   const [editSkillsList, setEditSkillsList] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Add state for application modal and cover letter
-  const [showApplyModal, setShowApplyModal] = useState(false);
-  const [coverLetter, setCoverLetter] = useState("");
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyError, setApplyError] = useState("");
   const [applySuccess, setApplySuccess] = useState(false);
-  const [jobToApply, setJobToApply] = useState(null);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -162,21 +162,27 @@ const JobSeekerDashboard = () => {
 
   const handleNextJob = () => {
     setCurrentJobIndex((prev) => (prev + 1 < jobs.length ? prev + 1 : 0));
+    setSwipedCount((prev) => (prev + 1 < jobs.length ? prev + 1 : 0));
   };
+
   const handlePrevJob = () => {
     setCurrentJobIndex((prev) => (prev - 1 >= 0 ? prev - 1 : jobs.length - 1));
+    setSwipedCount((prev) => (prev - 1 >= 0 ? prev - 1 : jobs.length - 1));
   };
 
   const handleEditInputChange = (e) => {
     const { name, value } = e.target;
     setEditForm((prev) => ({ ...prev, [name]: value }));
   };
+
   const handleEditResumeChange = (e) => {
     setEditForm((prev) => ({ ...prev, resume: e.target.files[0] }));
   };
+
   const handleEditProfilePictureChange = (e) => {
     setEditForm((prev) => ({ ...prev, profile_picture: e.target.files[0] }));
   };
+
   const handleAddEditSkill = () => {
     const skill = editSkillsInput.trim();
     if (skill && !editSkillsList.includes(skill)) {
@@ -187,9 +193,11 @@ const JobSeekerDashboard = () => {
       setEditSkillsInput('');
     }
   };
+
   const handleRemoveEditSkill = (idx) => {
     setEditSkillsList(prev => prev.filter((_, i) => i !== idx));
   };
+
   const handleEditProfile = async (e) => {
     e.preventDefault();
     setEditError('');
@@ -217,27 +225,17 @@ const JobSeekerDashboard = () => {
     }
   };
 
-  // Handler for Apply button
-  const handleOpenApplyModal = (job) => {
-    setJobToApply(job);
-    setCoverLetter("");
-    setApplyError("");
-    setShowApplyModal(true);
-  };
-
-  const handleApplyToJob = async () => {
-    if (!jobToApply) return;
+  const handleApplyOnCard = async (job) => {
     setApplyLoading(true);
     setApplyError("");
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://127.0.0.1:8000/api/jobs/${jobToApply.id}/apply/`,
-        { cover_letter: coverLetter },
+        `http://127.0.0.1:8000/api/jobs/${job.id}/apply/`,
+        {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setApplySuccess(true);
-      setShowApplyModal(false);
     } catch (err) {
       setApplyError(
         err.response?.data?.detail || "Failed to apply for job."
@@ -247,8 +245,30 @@ const JobSeekerDashboard = () => {
     }
   };
 
+  const [swipedCount, setSwipedCount] = useState(0);
+
+  useEffect(() => {
+    if (showJobsModal) {
+      setSwipedCount(0);
+    }
+  }, [showJobsModal, jobs]);
+
+  const handleSwipe = (direction, index) => {
+    setSwipedCount((prev) => prev + 1);
+    setCurrentJobIndex((prev) => (prev + 1 < jobs.length ? prev + 1 : 0));
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-2 sm:p-4 md:p-8">
+      <style>
+        {`
+          @media (max-width: 1023px) {
+            .nav-arrows {
+              display: none;
+            }
+          }
+        `}
+      </style>
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
@@ -355,13 +375,11 @@ const JobSeekerDashboard = () => {
       <Dialog
         open={showJobsModal}
         onClose={() => setShowJobsModal(false)}
-        maxWidth="md"
-        fullWidth
-        scroll="paper"
-        PaperProps={{ style: { borderRadius: 16, padding: 0, minHeight: '60vh', maxHeight: '90vh' } }}
+        fullScreen
+        PaperProps={{ style: { borderRadius: 0, padding: 0, height: '100vh', maxHeight: '100vh', width: '100vw', maxWidth: '100vw' } }}
       >
         <DialogTitle className="text-2xl font-bold text-center">Browse Jobs</DialogTitle>
-        <DialogContent dividers style={{ padding: 32 }}>
+        <DialogContent dividers style={{ padding: 0, height: 'calc(100vh - 64px)', maxHeight: 'calc(100vh - 64px)' }}>
           {loadingJobs ? (
             <div className="text-center py-8 text-lg">Loading jobs...</div>
           ) : jobsError ? (
@@ -372,110 +390,122 @@ const JobSeekerDashboard = () => {
               <div className="text-center text-gray-500 text-lg">No jobs available.<br/>Check back soon!</div>
             </div>
           ) : (
-            <div className="flex flex-col items-center">
-              {/* Job Counter */}
-              <div className="mb-4 text-gray-500 font-medium">Job {currentJobIndex + 1} of {jobs.length}</div>
-              {(() => {
-                const job = jobs[currentJobIndex];
-                const initials = job.company_info?.company_name?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() || 'C';
-                const logoUrl = job.company_info?.logo ? `http://127.0.0.1:8000${job.company_info.logo}` : null;
-                return (
-                  <div key={job.id} className="bg-gray-50 rounded-lg shadow p-6 w-full max-w-xl">
-                    <div className="flex items-center gap-4 mb-4">
-                      {logoUrl ? (
-                        <Avatar src={logoUrl} sx={{ width: 56, height: 56 }} />
-                      ) : (
-                        <Avatar sx={{ bgcolor: '#1976d2', width: 56, height: 56, fontSize: 28 }}>{initials}</Avatar>
-                      )}
-                      <div className="flex-1">
-                        <h3 className="text-xl font-bold text-blue-700 mb-1">{job.title}</h3>
-                        <span className="text-gray-600 font-semibold">{job.company_info?.company_name}</span>
-                      </div>
-                      <div className="flex flex-col gap-2 items-end">
-                        <Chip label={job.employment_type} color="primary" size="small" />
-                        {job.is_remote && <Chip label="Remote" color="success" size="small" />}
-                      </div>
-                    </div>
-                    <div className="mb-2 text-gray-700">{job.description}</div>
-                    <div className="mb-2 text-sm text-gray-500">Posted: {new Date(job.posted_at).toLocaleDateString()}</div>
-                    <Divider className="my-2" />
-                    <div className="mb-2">
-                      <span className="font-semibold">Location:</span> {job.location} {job.is_remote && <span className="ml-2 text-green-600">(Remote)</span>}
-                    </div>
-                    <div className="mb-2">
-                      <span className="font-semibold">Experience Level:</span> {job.experience_level}
-                    </div>
-                    <div className="mb-2">
-                      <span className="font-semibold">Salary:</span> {job.salary_type === 'Negotiable' ? 'Negotiable' : `${job.salary_min || ''}${job.salary_type === 'Range' ? ' - ' + job.salary_max : ''}`}
-                    </div>
-                    {job.requirements && job.requirements.length > 0 && (
-                      <div className="mb-2">
-                        <span className="font-semibold">Requirements:</span>
-                        <ul className="list-disc ml-6">
-                          {job.requirements.map((req, idx) => <li key={idx}>{req}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                    {job.benefits && job.benefits.length > 0 && (
-                      <div className="mb-2">
-                        <span className="font-semibold">Benefits:</span>
-                        <ul className="list-disc ml-6">
-                          {job.benefits.map((ben, idx) => <li key={idx}>{ben}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                    {job.company_info && (
-                      <div className="mt-2 text-sm text-gray-500">
-                        <span className="font-semibold">About {job.company_info.company_name}:</span> {job.company_info.description} <span className="ml-2">({job.company_info.industry})</span>
-                        {(job.company_info.linkedin || job.company_info.portfolio) && (
-                          <div className="flex flex-col gap-1 mt-1">
-                            {job.company_info.linkedin && (
-                              <div>
-                                <span className="font-semibold">LinkedIn:</span> <a href={job.company_info.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">{job.company_info.linkedin}</a>
-                              </div>
-                            )}
-                            {job.company_info.portfolio && (
-                              <div>
-                                <span className="font-semibold">Portfolio:</span> <a href={job.company_info.portfolio} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">{job.company_info.portfolio}</a>
+            <div className="flex flex-col items-center justify-center relative w-full h-full min-h-0" style={{ height: '100%', minHeight: 0 }}>
+              <div className="relative w-full h-full flex-1">
+                {jobs[swipedCount] && (
+                  <TinderCard
+                    key={jobs[swipedCount].id}
+                    className="absolute w-full h-full flex justify-center items-center"
+                    onSwipe={(dir) => handleSwipe(dir, swipedCount)}
+                    preventSwipe={['up', 'down']}
+                  >
+                    <div className="bg-gray-50 shadow w-full h-full flex flex-col items-center overflow-y-auto" style={{ borderRadius: 0, height: '100%', maxHeight: '100%', minHeight: 0 }}>
+                      <div className="w-full flex flex-col items-center p-6">
+                        <div className="flex items-center gap-4 mb-4">
+                          {jobs[swipedCount].company_info?.logo ? (
+                            <Avatar src={`http://127.0.0.1:8000${jobs[swipedCount].company_info.logo}`} sx={{ width: 56, height: 56 }} />
+                          ) : (
+                            <Avatar sx={{ bgcolor: '#1976d2', width: 56, height: 56, fontSize: 28 }}>{jobs[swipedCount].company_info?.company_name?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() || 'C'}</Avatar>
+                          )}
+                          <div className="flex-1">
+                            <h3 className="text-xl font-bold text-blue-700 mb-1">{jobs[swipedCount].title}</h3>
+                            <span className="text-gray-600 font-semibold">{jobs[swipedCount].company_info?.company_name}</span>
+                          </div>
+                          <div className="flex flex-col gap-2 items-end">
+                            <Chip label={jobs[swipedCount].employment_type} color="primary" size="small" />
+                            {jobs[swipedCount].is_remote && <Chip label="Remote" color="success" size="small" />}
+                          </div>
+                        </div>
+                        <div className="mb-2 text-gray-700">{jobs[swipedCount].description}</div>
+                        <div className="mb-2 text-sm text-gray-500">Posted: {new Date(jobs[swipedCount].posted_at).toLocaleDateString()}</div>
+                        <Divider className="my-2" />
+                        <div className="mb-2">
+                          <span className="font-semibold">Location:</span> {jobs[swipedCount].location} {jobs[swipedCount].is_remote && <span className="ml-2 text-green-600">(Remote)</span>}
+                        </div>
+                        <div className="mb-2">
+                          <span className="font-semibold">Experience Level:</span> {jobs[swipedCount].experience_level}
+                        </div>
+                        <div className="mb-2">
+                          <span className="font-semibold">Salary:</span> {jobs[swipedCount].salary_type === 'Negotiable' ? 'Negotiable' : `${jobs[swipedCount].salary_min || ''}${jobs[swipedCount].salary_type === 'Range' ? ' - ' + jobs[swipedCount].salary_max : ''}`}
+                        </div>
+                        {jobs[swipedCount].requirements && jobs[swipedCount].requirements.length > 0 && (
+                          <div className="mb-2">
+                            <span className="font-semibold">Requirements:</span>
+                            <ul className="list-disc ml-6">
+                              {jobs[swipedCount].requirements.map((req, idx) => <li key={idx}>{req}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {jobs[swipedCount].benefits && jobs[swipedCount].benefits.length > 0 && (
+                          <div className="mb-2">
+                            <span className="font-semibold">Benefits:</span>
+                            <ul className="list-disc ml-6">
+                              {jobs[swipedCount].benefits.map((ben, idx) => <li key={idx}>{ben}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {jobs[swipedCount].company_info && (
+                          <div className="mt-2 text-sm text-gray-500">
+                            <span className="font-semibold">About {jobs[swipedCount].company_info.company_name}:</span> {jobs[swipedCount].company_info.description} <span className="ml-2">({jobs[swipedCount].company_info.industry})</span>
+                            {(jobs[swipedCount].company_info.linkedin || jobs[swipedCount].company_info.portfolio) && (
+                              <div className="flex flex-col gap-1 mt-1">
+                                {jobs[swipedCount].company_info.linkedin && (
+                                  <div>
+                                    <span className="font-semibold">LinkedIn:</span> <a href={jobs[swipedCount].company_info.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">{jobs[swipedCount].company_info.linkedin}</a>
+                                  </div>
+                                )}
+                                {jobs[swipedCount].company_info.portfolio && (
+                                  <div>
+                                    <span className="font-semibold">Portfolio:</span> <a href={jobs[swipedCount].company_info.portfolio} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">{jobs[swipedCount].company_info.portfolio}</a>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
                         )}
                       </div>
-                    )}
-                    <div className="flex justify-between items-center mt-6">
-                      <Button onClick={handlePrevJob} variant="outlined" disabled={jobs.length <= 1}>Previous</Button>
-                      <Button color="primary" variant="contained" onClick={() => handleOpenApplyModal(job)}>Apply</Button>
-                      <Button onClick={handleNextJob} variant="outlined" disabled={jobs.length <= 1}>Next</Button>
                     </div>
+                  </TinderCard>
+                )}
+                {swipedCount >= jobs.length && (
+                  <div className="flex flex-col items-center justify-center h-full w-full absolute top-0 left-0 bg-white z-10">
+                    <span className="text-6xl mb-4">🎉</span>
+                    <div className="text-center text-gray-500 text-lg">No more jobs to browse.<br/>Check back soon!</div>
                   </div>
-                );
-              })()}
+                )}
+                {/* Navigation Arrows */}
+                {jobs.length > 0 && swipedCount < jobs.length && (
+                  <div className="nav-arrows absolute top-1/2 transform -translate-y-1/2 w-full flex justify-between px-4">
+                    <Button
+                      onClick={handlePrevJob}
+                      disabled={swipedCount === 0}
+                      sx={{ minWidth: 48, height: 48, borderRadius: '50%', backgroundColor: 'rgba(0, 0, 0, 0.5)', color: 'white', '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' } }}
+                    >
+                      <ArrowBackIosIcon />
+                    </Button>
+                    <Button
+                      onClick={handleNextJob}
+                      disabled={swipedCount >= jobs.length - 1}
+                      sx={{ minWidth: 48, height: 48, borderRadius: '50%', backgroundColor: 'rgba(0, 0, 0, 0.5)', color: 'white', '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' } }}
+                    >
+                      <ArrowForwardIosIcon />
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
         <DialogActions style={{ padding: 24 }}>
-          <Button onClick={() => setShowJobsModal(false)} color="secondary" variant="outlined">Close</Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog open={showApplyModal} onClose={() => setShowApplyModal(false)} maxWidth="sm" fullWidth>
-        <DialogTitle className="text-xl font-bold text-center">Apply for {jobToApply?.title}</DialogTitle>
-        <DialogContent dividers style={{ padding: 32 }}>
-          <label className="block mb-2 font-medium">Cover Letter</label>
-          <textarea
-            className="w-full p-2 border rounded min-h-[120px]"
-            value={coverLetter}
-            onChange={e => setCoverLetter(e.target.value)}
-            placeholder="Write a brief cover letter..."
-            rows={6}
-          />
-          {applyError && <p className="text-red-500 mt-2">{applyError}</p>}
-        </DialogContent>
-        <DialogActions style={{ padding: 24 }}>
-          <Button onClick={() => setShowApplyModal(false)} color="secondary" variant="outlined" disabled={applyLoading}>Cancel</Button>
-          <Button onClick={handleApplyToJob} color="primary" variant="contained" disabled={applyLoading || !coverLetter.trim()}>
-            {applyLoading ? "Applying..." : "Confirm & Apply"}
+          <Button
+            color="primary"
+            variant="contained"
+            disabled={!jobs[swipedCount] || applyLoading}
+            onClick={() => jobs[swipedCount] && handleApplyOnCard(jobs[swipedCount])}
+          >
+            {applyLoading ? "Applying..." : "Apply"}
           </Button>
+          <Button onClick={() => setShowJobsModal(false)} color="secondary" variant="outlined">Close</Button>
         </DialogActions>
       </Dialog>
       <Snackbar
@@ -484,6 +514,14 @@ const JobSeekerDashboard = () => {
         onClose={() => setApplySuccess(false)}
         message="Application submitted!"
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+      <Snackbar
+        open={!!applyError}
+        autoHideDuration={4000}
+        onClose={() => setApplyError("")}
+        message={applyError}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        ContentProps={{ sx: { backgroundColor: '#d32f2f' } }} // Red background for error
       />
       <Dialog
         open={showEditModal}
@@ -517,7 +555,7 @@ const JobSeekerDashboard = () => {
                 {editSkillsList.map((skill, idx) => (
                   <span key={idx} className="bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center">
                     {skill}
-                    <button type="button" onClick={() => handleRemoveEditSkill(idx)} className="ml-2 text-red-500">&times;</button>
+                    <button type="button" onClick={() => handleRemoveEditSkill(idx)} className="ml-2 text-red-500">×</button>
                   </span>
                 ))}
               </div>
@@ -572,4 +610,4 @@ const JobSeekerDashboard = () => {
   );
 };
 
-export default JobSeekerDashboard; 
+export default JobSeekerDashboard;

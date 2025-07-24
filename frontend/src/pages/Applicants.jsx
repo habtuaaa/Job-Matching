@@ -232,7 +232,7 @@ const Applicants = () => {
                     {renderApplicantDetails(app)}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-4">
                       <div className="flex gap-2">
-                        <Button variant="outlined" onClick={() => setSelectedApp(app)}>View Cover Letter</Button>
+                        <Button variant="outlined" onClick={() => setSelectedApp(app)}>Details</Button>
                         <Button variant="contained" color="primary" onClick={() => navigate('/messages', { state: { applicationId: app.id } })}>Message</Button>
                         <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${app.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : app.status === 'Accepted' ? 'bg-green-100 text-green-800' : app.status === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>{app.status}</span>
                       </div>
@@ -246,7 +246,7 @@ const Applicants = () => {
         </div>
       )}
       <Dialog open={!!selectedApp} onClose={() => setSelectedApp(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Applicant Details & Cover Letter</DialogTitle>
+        <DialogTitle>Applicant Details</DialogTitle>
         <DialogContent dividers>
           <div className="mb-2 font-semibold text-lg text-blue-800">{selectedApp?.applicant?.name || selectedApp?.applicant?.email}</div>
           <div className="mb-2 text-gray-500 text-sm">Email: {selectedApp?.applicant?.email}</div>
@@ -276,11 +276,6 @@ const Applicants = () => {
             </Button>
           </div>
           {statusError && <div className="text-red-500 mb-4">{statusError}</div>}
-
-          <div className="mb-6">
-            <div className="font-semibold text-base text-green-700 mb-2">Cover Letter</div>
-            <div className="whitespace-pre-line bg-gray-50 p-4 rounded border text-gray-800 min-h-[100px]">{selectedApp?.cover_letter || 'No cover letter provided.'}</div>
-          </div>
 
           <div className="mb-4">
             <div className="font-semibold text-base text-green-700 mb-1">Education</div>
